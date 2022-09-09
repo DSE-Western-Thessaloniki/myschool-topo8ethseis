@@ -1,0 +1,13 @@
+{
+	"typescript.tsdk": "node_modules/typescript/lib",
+	"cSpell.ignoreWords": [
+		"MYSCH",
+		"dxgv",
+		"networkidle"
+	],
+	"cSpell.words": [
+		"defval",
+		"φυλλομετρητή",
+		"χρονοσφραγίδα"
+	]
+}
