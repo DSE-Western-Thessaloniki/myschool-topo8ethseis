@@ -2,7 +2,7 @@ import type { Page } from "puppeteer-core";
 import type { XLSX_JSON } from "./types";
 
 async function addTeacher(page: Page, teacher: XLSX_JSON) {
-  console.log(page, teacher);
+  console.log(teacher);
 
   let record = {
     "ΑΜ/ΑΦΜ":
@@ -59,7 +59,6 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       console.log("Δες αν βρέθηκε ο/η εκπαιδευτικός");
-      await page.screenshot({ path: "teacher.png" });
       return await page.waitForSelector(
         "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0",
         { visible: true }
@@ -67,7 +66,6 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       // Έλεγξε αν έχει class dxgvFocusedRow
-      await page.screenshot({ path: "search.png" });
       return await page
         .$("#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0")
         .then(async (element) => {
@@ -89,7 +87,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
       // Κάνε κλικ στον εκπαιδευτικό
       console.log("Κάνε κλικ στον εκπαιδευτικό");
       return await page
-        .$("#ctl00_ContentData_cmbWorker_I")
+        .$("#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0")
         .then(async (element) => {
           if (element) {
             return await element.click();
@@ -99,6 +97,12 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
             new Error("Δεν μπορώ να κάνω κλικ στον εκπαιδευτικό!")
           );
         });
+    })
+    .then(async () => {
+      console.log("Περίμενε μέχρι να περαστεί το ωράριο του/της εκπαιδευτικού");
+      return page.waitForSelector(
+        "span.dxeIRadioButton.dxEditors_edtRadioButtonChecked"
+      );
     })
     .then(() => {
       console.log("Πληκτρολόγησε τον κωδικό του σχολείου");
@@ -110,33 +114,17 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(() => {
       console.log("Δες αν βρέθηκε το σχολείο");
-      return page.waitForSelector("#ctl00_ContentData_cmbUnit_DDD_L_LBI0T0");
-    })
-    .then(async () => {
-      // Έλεγξε αν έχει class dxeListBoxItemSelected
-      return await page
-        .$("#ctl00_ContentData_cmbUnit_DDD_L_LBI0T0")
-        .then(async (element) => {
-          if (element) {
-            const classNames = (
-              await (await element.getProperty("className")).jsonValue()
-            ).split(/\s+/);
-            console.log("Class:", classNames);
-            if (classNames.includes("dxeListBoxItemSelected")) {
-              return Promise.resolve();
-            }
-          }
-
-          return Promise.reject(
-            new Error("Πρόβλημα κατά την αναζήτηση του σχολείου!")
-          );
-        });
+      return page.waitForSelector(
+        "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected"
+      );
     })
     .then(async () => {
       // Κάνε κλικ στο σχολείο
       console.log("Κάνε κλικ στο σχολείο");
       return await page
-        .$("#ctl00_ContentData_cmbUnit_DDD_L_LBI0T0")
+        .$(
+          "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected"
+        )
         .then(async (element) => {
           if (element) {
             return await element.click();
@@ -165,6 +153,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
             (await page.evaluate((el) => el.textContent, element)) ?? "null",
         });
       }
+      console.log(categories.map((c) => c.name));
 
       // Κάνε έλεγχο αν ο τύπος τοποθέτησης είναι έγκυρος
       if (!categories.map((c) => c.name).includes(record["ΤΟΠΟΘΕΤΗΣΗ"])) {
@@ -217,24 +206,35 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       console.log("Συμπλήρωσε τις απαιτούμενες ώρες");
-      // ctl00_ContentData_lbEditHours_RB0 >
+      if (record["ΩΡΕΣ"]) {
+        const hours = parseInt(record["ΩΡΕΣ"]);
+        const radioButton = await page.$(
+          "#ctl00_ContentData_lbEditHours_RB" + (hours - 1) + "_I_D"
+        );
+        if (radioButton) {
+          return await radioButton.click();
+        } else {
+          return Promise.reject(
+            new Error("Δεν βρέθηκε το radioButton για την επιλογή των ωρών.")
+          );
+        }
+      } else {
+        return Promise.resolve();
+      }
     })
     .then(async () => {
-      await page.screenshot({ path: "complete.png" });
       console.log("Αποθήκευσε την τοποθέτηση");
-      await Promise.all([
+      return await Promise.all([
         page.click("#ctl00_ContentData_savePlacement"),
         page.waitForNavigation({ waitUntil: "networkidle2" }),
       ]);
-      return await page.screenshot({ path: "complete2.png" });
     })
     .then(async () => {
       console.log("Καθάρισε τα στοιχεία τοποθέτησης");
-      await Promise.all([
+      return await Promise.all([
         page.click("#ctl00_ContentData_btnClear"),
         page.waitForNavigation({ waitUntil: "networkidle2" }),
       ]);
-      return await page.screenshot({ path: "clear.png" });
     });
 }
 
@@ -281,7 +281,6 @@ export default async function start({
     })
     .then(async (response) => {
       // Πρέπει για κάθε γραμμή του πίνακα να προσθέσουμε εκπαιδευτικό
-      await page.screenshot({ path: "topo8.png" });
       let errorFound = false;
       let errorMsg = "";
       for (const teacher of xlsxData) {

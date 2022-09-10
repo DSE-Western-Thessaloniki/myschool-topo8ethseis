@@ -90,12 +90,16 @@ function getXlsxData(fileName: string): XLSX_JSON[] {
 
   console.log("Αρχικοποίηση σύνδεσης με τον φυλλομετρητή");
   const browser = await puppeteer.connect({
-    browserWSEndpoint: "ws://172.17.0.4:3000",
+    browserWSEndpoint: "ws://host.docker.internal:3000",
     ignoreHTTPSErrors: true,
   });
   const page = await browser.newPage();
 
-  await start({ page, xlsxData });
+  await start({ page, xlsxData }).catch(async (err) => {
+    console.log(err);
+    await page.screenshot({ path: "error.png" });
+    return Promise.reject(err);
+  });
 
   for (let page of await browser.pages()) {
     await page.close();
@@ -106,6 +110,5 @@ function getXlsxData(fileName: string): XLSX_JSON[] {
 })()
   .then(() => console.log("Η εργασία ολοκληρώθηκε!"))
   .catch((err) => {
-    console.error(err);
     process.exit(1);
   });
