@@ -81,7 +81,7 @@ function getXlsxData(fileName: string): XLSX_JSON[] {
   let xlsxData: XLSX_JSON[];
 
   try {
-    xlsxData = getXlsxData("test.xlsx");
+    xlsxData = getXlsxData("file.xlsx");
   } catch (err) {
     return Promise.reject(err);
   }
