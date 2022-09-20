@@ -305,7 +305,10 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       console.log("Αποθήκευσε την τοποθέτηση");
-      await page.screenshot({ path: "img/" + record["ΑΜ/ΑΦΜ"] + ".png" });
+      await page.screenshot({
+        path: "img/" + record["ΑΜ/ΑΦΜ"] + ".png",
+        fullPage: true,
+      });
       // return Promise.resolve();
       return await Promise.all([
         page.click("#ctl00_ContentData_savePlacement"),
@@ -376,7 +379,7 @@ export default async function start({
 
         // Στην περίπτωση σφάλματος πρέπει να σταματήσουμε την καταχώρηση
         if (errorFound) {
-          await page.screenshot({ path: "error.png" });
+          await page.screenshot({ path: "error.png", fullPage: true });
           console.log("Error!");
           break;
         }
