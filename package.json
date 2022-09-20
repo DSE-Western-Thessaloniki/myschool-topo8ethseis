@@ -15,7 +15,7 @@
   "dependencies": {
     "console-stamp": "^3.0.2",
     "dotenv": "^16.0.0",
-    "puppeteer-core": "^17.0.0",
+    "puppeteer-core": "^18.0.0",
     "typescript": "^4.8.2",
     "xlsx": "^0.18.5"
   }
