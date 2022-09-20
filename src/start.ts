@@ -31,6 +31,16 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
         : teacher["ΩΡΕΣ"].toString(),
   };
 
+  await page.$("#ctl00_ContentData_info > span").then(async (element) => {
+    if (element !== null) {
+      const msg = await page.evaluate((el) => el.innerHTML, element);
+      console.log("Μήνυμα μετά την αποθήκευση: '" + msg + "'");
+      if (msg !== "Η αποθήκευση ολοκληρώθηκε") {
+        console.error(msg);
+      }
+    }
+  });
+
   // Κάνε έλεγχο για κενές τιμές
   if (
     record["ΑΜ/ΑΦΜ"] === "" ||
@@ -40,7 +50,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     record["ΤΟΠΟΘΕΤΗΣΗ"] === ""
   ) {
     console.warn("Αγνόηση γραμμής με κενές τιμές: " + teacher);
-    return Promise.resolve();
+    return await Promise.resolve();
   }
 
   return await page
@@ -71,14 +81,16 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
         .then(async (element) => {
           if (element) {
             const classNames = (
-              await (await element.getProperty("className")).jsonValue()
+              (await (
+                await element.getProperty("className")
+              ).jsonValue()) as string
             ).split(/\s+/);
             if (classNames.includes("dxgvFocusedRow")) {
-              return Promise.resolve();
+              return await Promise.resolve();
             }
           }
 
-          return Promise.reject(
+          return await Promise.reject(
             new Error("Πρόβλημα κατά την αναζήτηση του εκπαιδευτικού!")
           );
         });
@@ -93,28 +105,28 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
             return await element.click();
           }
 
-          return Promise.reject(
+          return await Promise.reject(
             new Error("Δεν μπορώ να κάνω κλικ στον εκπαιδευτικό!")
           );
         });
     })
     .then(async () => {
       console.log("Περίμενε μέχρι να περαστεί το ωράριο του/της εκπαιδευτικού");
-      return page.waitForSelector(
+      return await page.waitForSelector(
         "span.dxeIRadioButton.dxEditors_edtRadioButtonChecked"
       );
     })
-    .then(() => {
+    .then(async () => {
       console.log("Πληκτρολόγησε τον κωδικό του σχολείου");
-      return page.type("#ctl00_ContentData_cmbUnit_I", record["ΣΧΟΛΕΙΟ"]);
+      return await page.type("#ctl00_ContentData_cmbUnit_I", record["ΣΧΟΛΕΙΟ"]);
     })
     .then(async () => {
       console.log("Περίμενε για ανάκτηση δεδομένων");
       return await page.waitForNetworkIdle({ idleTime: 1000 });
     })
-    .then(() => {
+    .then(async () => {
       console.log("Δες αν βρέθηκε το σχολείο");
-      return page.waitForSelector(
+      return await page.waitForSelector(
         "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected"
       );
     })
@@ -130,7 +142,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
             return await element.click();
           }
 
-          return Promise.reject(
+          return await Promise.reject(
             new Error("Δεν μπορώ να κάνω κλικ στο σχολείο!")
           );
         });
@@ -157,7 +169,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
 
       // Κάνε έλεγχο αν ο τύπος τοποθέτησης είναι έγκυρος
       if (!categories.map((c) => c.name).includes(record["ΤΟΠΟΘΕΤΗΣΗ"])) {
-        Promise.reject(
+        return await Promise.reject(
           new Error(
             "Εσφαλμένος τύπος τοποθέτησης για " +
               record["ΑΜ/ΑΦΜ"] +
@@ -168,22 +180,82 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
         );
       }
 
+      let found_id = "";
       for (const category of categories) {
         if (category.name === record["ΤΟΠΟΘΕΤΗΣΗ"]) {
-          return await page.click("#" + category.id);
+          found_id = category.id;
         }
+      }
+      if (found_id) {
+        return await page.click("#" + found_id);
+      } else {
+        return await Promise.reject(
+          new Error("Δεν βρέθηκε το id της τοποθέτησης!")
+        );
       }
     })
     .then(async () => {
       // Συμπλήρωσε την έναρξη τοποθέτησης
-      const input = await page.$("#ctl00_ContentData_dateFrom_I");
-      if (input) {
-        await input.click({ clickCount: 3 });
-        await input.type(record["ΑΠΟ"]);
+      console.log(
+        "Συμπλήρωση την ημερομηνία έναρξης τοποθέτησης (" + record["ΑΠΟ"] + ")"
+      );
+      // return await page.evaluate(`async () => {
+      //   const el = document.getElementById("ctl00_ContentData_dateFrom_I");
+      //   if (el instanceof HTMLInputElement) {
+      //     el.value = ${record["ΑΠΟ"]};
+      //     return await Promise.resolve();
+      //   } else {
+      //     return await Promise.reject(
+      //       new Error(
+      //         "Δεν βρέθηκε το πεδίο την ημερομηνία έναρξης ισχύος τοποθέτησης!"
+      //       )
+      //     );
+      //   }
+      // }`);
+      // const input = await page.waitForSelector("#ctl00_ContentData_dateFrom_I");
+      // if (input !== null) {
+      //   return await page
+      //     .click("#ctl00_ContentData_dateFrom_I")
+      //     .then(async () => {
+      //       return await page.keyboard.down("Control");
+      //     })
+      //     .then(async () => {
+      //       return await page.keyboard.press("A");
+      //     })
+      //     .then(async () => {
+      //       return await page.keyboard.up("Control");
+      //     })
+      //     .then(async () => {
+      //       return await page.keyboard.press("Backspace");
+      //     })
+      //     .then(async () => {
+      //       console.log("WTF? ", record["ΑΠΟ"]);
+      //       return await page.keyboard.type(record["ΑΠΟ"], { delay: 100 });
+      //     })
+      //     .then(async () => {
+      //       // Πατάμε enter για να αλλάξουν οι ημέρες της εβδομάδας σε "Άγνωστο"
+      //       return await page.keyboard.press("Enter");
+      //     });
+      // } else {
+      //   return await Promise.reject(
+      //     new Error(
+      //       "Δεν βρέθηκε το πεδίο την ημερομηνία έναρξης ισχύος τοποθέτησης!"
+      //     )
+      //   );
+      // }
+      const input = await page.waitForSelector("#ctl00_ContentData_dateFrom_I");
+      if (input !== null) {
+        await page.click("#ctl00_ContentData_dateFrom_I", {
+          delay: 1000, // Χρειάζεται αλλιώς δεν παίζει σωστά
+          clickCount: 3,
+        });
+        await page.type("#ctl00_ContentData_dateFrom_I", record["ΑΠΟ"], {
+          delay: 100,
+        });
         // Πατάμε enter για να αλλάξουν οι ημέρες της εβδομάδας σε "Άγνωστο"
         return await page.keyboard.press("Enter");
       } else {
-        Promise.reject(
+        return await Promise.reject(
           new Error(
             "Δεν βρέθηκε το πεδίο την ημερομηνία έναρξης ισχύος τοποθέτησης!"
           )
@@ -192,12 +264,21 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       // Συμπλήρωσε την λήξη τοποθέτησης
-      const input = await page.$("#ctl00_ContentData_dateTo_I");
-      if (input) {
-        await input.click({ clickCount: 3 });
-        return await input.type(record["ΕΩΣ"]);
+      console.log(
+        "Συμπλήρωση την ημερομηνία λήξης τοποθέτησης (" + record["ΕΩΣ"] + ")"
+      );
+      const input = await page.waitForSelector("#ctl00_ContentData_dateTo_I");
+      if (input !== null) {
+        await page.click("#ctl00_ContentData_dateTo_I", {
+          delay: 1000,
+          clickCount: 3,
+        });
+        await page.type("#ctl00_ContentData_dateTo_I", record["ΕΩΣ"], {
+          delay: 100,
+        });
+        return await page.keyboard.press("Enter");
       } else {
-        Promise.reject(
+        return await Promise.reject(
           new Error(
             "Δεν βρέθηκε το πεδίο την ημερομηνία λήξης ισχύος τοποθέτησης!"
           )
@@ -205,7 +286,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
       }
     })
     .then(async () => {
-      console.log("Συμπλήρωσε τις απαιτούμενες ώρες");
+      console.log("Συμπλήρωσε τις απαιτούμενες ώρες (" + record["ΩΡΕΣ"] + ")");
       if (record["ΩΡΕΣ"]) {
         const hours = parseInt(record["ΩΡΕΣ"]);
         const radioButton = await page.$(
@@ -214,16 +295,18 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
         if (radioButton) {
           return await radioButton.click();
         } else {
-          return Promise.reject(
+          return await Promise.reject(
             new Error("Δεν βρέθηκε το radioButton για την επιλογή των ωρών.")
           );
         }
       } else {
-        return Promise.resolve();
+        return await Promise.resolve();
       }
     })
     .then(async () => {
       console.log("Αποθήκευσε την τοποθέτηση");
+      await page.screenshot({ path: "img/" + record["ΑΜ/ΑΦΜ"] + ".png" });
+      // return Promise.resolve();
       return await Promise.all([
         page.click("#ctl00_ContentData_savePlacement"),
         page.waitForNavigation({ waitUntil: "networkidle2" }),
@@ -293,16 +376,17 @@ export default async function start({
 
         // Στην περίπτωση σφάλματος πρέπει να σταματήσουμε την καταχώρηση
         if (errorFound) {
+          await page.screenshot({ path: "error.png" });
           console.log("Error!");
           break;
         }
         // });
       }
       if (errorFound) {
-        return Promise.reject();
+        return await Promise.reject();
       }
 
-      return Promise.resolve();
+      return await Promise.resolve();
     })
     .finally(() => {
       console.log("Τέλος");
