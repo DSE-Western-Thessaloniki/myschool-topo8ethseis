@@ -64,42 +64,88 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
       );
     })
     .then(async () => {
-      console.log("Περίμενε να ανακτηθούν οι πληροφορίες του εκπαιδευτικού");
-      return await page.waitForNetworkIdle({ idleTime: 3000 });
-    })
-    .then(async () => {
       console.log("Δες αν βρέθηκε ο/η εκπαιδευτικός");
       return await page.waitForSelector(
         "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0",
         { visible: true }
       );
     })
-    .then(async () => {
-      // Έλεγξε αν έχει class dxgvFocusedRow
-      return await page
-        .$("#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0")
-        .then(async (element) => {
-          if (element) {
-            const classNames = (
-              (await (
-                await element.getProperty("className")
-              ).jsonValue()) as string
-            ).split(/\s+/);
-            if (classNames.includes("dxgvFocusedRow")) {
-              return await Promise.resolve();
-            }
-          }
+    // .then(async () => {
+    //   // Έλεγξε αν έχει class dxgvFocusedRow
+    //   return await page
+    //     .$("#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0")
+    //     .then(async (element) => {
+    //       if (element) {
+    //         const classNames = (
+    //           (await (
+    //             await element.getProperty("className")
+    //           ).jsonValue()) as string
+    //         ).split(/\s+/);
+    //         if (classNames.includes("dxgvFocusedRow")) {
+    //           return await Promise.resolve();
+    //         }
+    //       }
 
-          return await Promise.reject(
-            new Error("Πρόβλημα κατά την αναζήτηση του εκπαιδευτικού!")
-          );
-        });
-    })
+    //       return await Promise.reject(
+    //         new Error("Πρόβλημα κατά την αναζήτηση του εκπαιδευτικού!")
+    //       );
+    //     });
+    // })
     .then(async () => {
+      console.log("Περίμενε να ανακτηθούν οι πληροφορίες του εκπαιδευτικού");
+      await new Promise((r) => setTimeout(r, 3000));
+
+      // Δες αν υπάρχουν γραμμές πέρα από την πρώτη που ταιριάζουν στο κείμενο
+      // που εισάγαμε. Μετράει τις γραμμές πέρα από την πρώτη
+      const rows = (
+        await page.$$(
+          "#ctl00_ContentData_cmbWorker_DDD_gv_DXMainTable tr.dxgvDataRow"
+        )
+      ).length;
+      console.log(`Βρέθηκαν ${rows} επιπλέον γραμμές πλην της κύριας`);
+
+      let am = await page.$eval(
+        "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0 td:nth-child(1)",
+        (el) => el.textContent
+      );
+      let afm = await page.$eval(
+        "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0 td:nth-child(2)",
+        (el) => el.textContent
+      );
+      if (am != record["ΑΜ/ΑΦΜ"] && afm != record["ΑΜ/ΑΦΜ"]) {
+        console.log("Λάθος ΑΜ στην πρώτη γραμμή!");
+      } else {
+        return await Promise.resolve(0);
+      }
+
+      for (let i = 0; i < rows; i++) {
+        let am = await page.$eval(
+          `#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow${
+            i + 1
+          } td:nth-child(1)`,
+          (el) => el.textContent
+        );
+        let afm = await page.$eval(
+          `#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow${
+            i + 1
+          } td:nth-child(2)`,
+          (el) => el.textContent
+        );
+        if (am != record["ΑΜ/ΑΦΜ"] && afm != record["ΑΜ/ΑΦΜ"]) {
+          console.log(`Λάθος ΑΜ στην ${i + 1}η γραμμή!`);
+        } else {
+          return await Promise.resolve(i + 1);
+        }
+      }
+
+      console.log("Δεν βρέθηκε εκπαιδευτικός με αυτό το ΑΜ/ΑΦΜ");
+      return await Promise.reject();
+    })
+    .then(async (value) => {
       // Κάνε κλικ στον εκπαιδευτικό
       console.log("Κάνε κλικ στον εκπαιδευτικό");
       return await page
-        .$("#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0")
+        .$(`#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow${value}`)
         .then(async (element) => {
           if (element) {
             return await element.click();
@@ -118,17 +164,28 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       console.log("Πληκτρολόγησε τον κωδικό του σχολείου");
-      return await page.type("#ctl00_ContentData_cmbUnit_I", record["ΣΧΟΛΕΙΟ"]);
-    })
-    .then(async () => {
-      console.log("Περίμενε για ανάκτηση δεδομένων");
-      return await page.waitForNetworkIdle({ idleTime: 1000 });
+      return await Promise.all([
+        page.type("#ctl00_ContentData_cmbUnit_I", record["ΣΧΟΛΕΙΟ"]),
+      ]);
     })
     .then(async () => {
       console.log("Δες αν βρέθηκε το σχολείο");
-      return await page.waitForSelector(
+      await page.waitForSelector(
         "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected"
       );
+      await new Promise((r) => setTimeout(r, 2000));
+      const sch = await page.$eval(
+        "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected:nth-child(1)",
+        (el) => el.textContent
+      );
+      if (sch != record["ΣΧΟΛΕΙΟ"]) {
+        console.log(sch);
+        console.log(record["ΣΧΟΛΕΙΟ"]);
+        console.log("Λάθος κωδικός σχολείου στην πρώτη γραμμή!");
+        await Promise.reject();
+      }
+
+      return Promise.resolve();
     })
     .then(async () => {
       // Κάνε κλικ στο σχολείο
@@ -149,7 +206,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       console.log("Περίμενε για ανάκτηση δεδομένων τύπων τοποθέτησης");
-      return await page.waitForNetworkIdle({ idleTime: 3000 });
+      return await new Promise((r) => setTimeout(r, 2000));
     })
     .then(async () => {
       console.log("Διάβασε τους τύπους τοποθέτησης και επέλεξε τον κατάλληλο");
@@ -334,7 +391,7 @@ export default async function start({
   // ---------------
   // Κάνε login στο σύστημα
   console.log("Εμφάνισε αρχική σελίδα");
-  await page.goto("https://app.myschool.sch.gr", { waitUntil: "networkidle0" });
+  await page.goto("https://app.myschool.sch.gr", { waitUntil: "networkidle2" });
 
   if (
     typeof process.env.MYSCH_USERNAME === "undefined" ||
@@ -343,10 +400,42 @@ export default async function start({
     console.log("MYSCH_USERNAME και MYSCH_PASSWORD είναι κενά!");
     return;
   }
+  await page.waitForSelector("#username");
+  await page.waitForSelector("#password");
   await page.type("#username", process.env.MYSCH_USERNAME);
   await page.type("#password", process.env.MYSCH_PASSWORD);
   console.log("Κάνε login");
   await Promise.all([page.click("#loginButton"), page.waitForNavigation()]);
+  // ---------------
+
+  // ---------------
+  // Άλλαξε τη σχολική χρονιά
+  // await page
+  //   .waitForSelector("#ctl00_ContentData_cmbActiveAcadYear_B-1")
+  //   .then(async () => {
+  //     // Άνοιξε την λίστα των σχολικών ετών
+  //     return await page.click("#ctl00_ContentData_cmbActiveAcadYear_B-1", {
+  //       delay: 1000,
+  //     });
+  //   })
+  //   .then(async () => {
+  //     return await page.waitForSelector(
+  //       "#ctl00_ContentData_cmbActiveAcadYear_DDD_L_LBT"
+  //     );
+  //   })
+  //   .then(async () => {
+  //     // Διάλεξε την πρώτη επιλογή
+  //     return await page.click(
+  //       "#ctl00_ContentData_cmbActiveAcadYear_DDD_L_LBI0T0",
+  //       {
+  //         delay: 1000,
+  //       }
+  //     );
+  //   })
+  //   .then(async () => {
+  //     return await page.waitForNavigation();
+  //   });
+
   // ---------------
 
   // ---------------
