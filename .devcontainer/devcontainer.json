@@ -7,9 +7,10 @@
 		// Update 'VARIANT' to pick a Node version: 18, 16, 14.
 		// Append -bullseye or -buster to pin to an OS version.
 		// Use -bullseye variants on local arm64/Apple Silicon.
-		"args": { "VARIANT": "18-bullseye" }
+		"args": {
+			"VARIANT": "18-bullseye"
+		}
 	},
-
 	// Configure tool-specific properties.
 	"customizations": {
 		// Configure properties specific to VS Code.
@@ -25,23 +26,21 @@
 				"VisualStudioExptTeam.intellicode-api-usage-examples",
 				"Cardinal90.multi-cursor-case-preserve",
 				"christian-kohler.path-intellisense",
-				"TabNine.tabnine-vscode",
 				"esbenp.prettier-vscode",
 				"GrapeCity.gc-excelviewer"
 			]
 		}
 	},
-
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
-
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "yarn install",
-
 	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
 	"remoteUser": "node",
 	"features": {
 		"git": "os-provided"
 	},
-	"runArgs": ["--add-host=host.docker.internal:host-gateway"]
+	"runArgs": [
+		"--add-host=host.docker.internal:host-gateway"
+	]
 }
