@@ -54,7 +54,9 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
   }
 
   return await page
-    .waitForSelector("#ctl00_ContentData_cmbWorker_I")
+    .waitForSelector("#ctl00_ContentData_cmbWorker_I", {
+      timeout: 100000,
+    })
     .then(async () => {
       // Συμπλήρωσε το ΑΜ/ΑΦΜ και περίμενε για το αποτέλεσμα της αναζήτησης
       console.log("Πληκτρολόγησε το ΑΜ/ΑΦΜ του εκπαιδευτικού");
@@ -406,6 +408,15 @@ export default async function start({
   await page.type("#password", process.env.MYSCH_PASSWORD);
   console.log("Κάνε login");
   await Promise.all([page.click("#loginButton"), page.waitForNavigation()]);
+  console.log("Κάνε logout");
+  await Promise.all([page.click("li.logout > a"), page.waitForNavigation()]);
+  await page.waitForSelector("#username");
+  await page.waitForSelector("#password");
+  await page.type("#username", process.env.MYSCH_USERNAME);
+  await page.type("#password", process.env.MYSCH_PASSWORD);
+  console.log("Κάνε login");
+  await Promise.all([page.click("#loginButton"), page.waitForNavigation()]);
+
   // ---------------
 
   // ---------------
