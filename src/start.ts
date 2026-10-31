@@ -1,7 +1,9 @@
 import type { Page } from "puppeteer-core";
+import { bus } from "./bus.js";
+import { errorText } from "./errors.js";
 import type { XLSX_JSON } from "./types";
 
-async function addTeacher(page: Page, teacher: XLSX_JSON) {
+async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
   console.log(teacher);
 
   let record = {
@@ -364,10 +366,13 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
     })
     .then(async () => {
       console.log("Αποθήκευσε την τοποθέτηση");
+      const shotFile = "img/" + record["ΑΜ/ΑΦΜ"] + ".png";
       await page.screenshot({
-        path: "img/" + record["ΑΜ/ΑΦΜ"] + ".png",
+        path: shotFile,
         fullPage: true,
       });
+      // Στείλε το στιγμιότυπο στην διεπαφή ώστε να εμφανιστεί δίπλα από την γραμμή
+      bus.screenshot(index, shotFile);
       // return Promise.resolve();
       return await Promise.all([
         page.click("#ctl00_ContentData_savePlacement"),
@@ -386,10 +391,12 @@ async function addTeacher(page: Page, teacher: XLSX_JSON) {
 export default async function start({
   page,
   xlsxData,
+  isStopped,
 }: {
   page: Page;
   xlsxData: XLSX_JSON[];
-}): Promise<void> {
+  isStopped: () => boolean;
+}): Promise<{ stopped: boolean }> {
   // ---------------
   // Κάνε login στο σύστημα
   console.log("Εμφάνισε αρχική σελίδα");
@@ -400,7 +407,7 @@ export default async function start({
     typeof process.env.MYSCH_PASSWORD === "undefined"
   ) {
     console.log("MYSCH_USERNAME και MYSCH_PASSWORD είναι κενά!");
-    return;
+    return { stopped: false };
   }
   await page.waitForSelector("#username");
   await page.waitForSelector("#password");
@@ -456,7 +463,7 @@ export default async function start({
     page.goto("https://app.myschool.sch.gr/Management.list.Act.Placement.aspx"),
     page.waitForNavigation(),
   ]);
-  await page
+  return await page
     .waitForSelector("#ctl00_ContentData_gridActsTemp_header0_new")
     .then(async (response) => {
       console.log("Πάτησε για προσθήκη απόφασης τοποθέτησης");
@@ -468,28 +475,52 @@ export default async function start({
     .then(async (response) => {
       // Πρέπει για κάθε γραμμή του πίνακα να προσθέσουμε εκπαιδευτικό
       let errorFound = false;
-      let errorMsg = "";
-      for (const teacher of xlsxData) {
+      let lastError: string | undefined;
+      for (let i = 0; i < xlsxData.length; i++) {
+        // Αν ο χρήστης ζήτησε διακοπή μην ξεκινήσεις νέα γραμμή
+        if (isStopped()) break;
+
+        const teacher = xlsxData[i];
         console.log("Νέα γραμμή");
-        await addTeacher(page, teacher).catch((error) => {
-          console.log(error);
-          errorFound = true;
-          errorMsg = error.message;
-        });
+        bus.rowStart(i);
+        await addTeacher(page, teacher, i)
+          .then(() => {
+            if (!errorFound) {
+              bus.rowOk(i);
+            }
+          })
+          .catch((error: unknown) => {
+            // Σε διακοπή η σελίδα κλείνει και τα βήματα αποτυγχάνουν
+            // φυσιολογικά — δεν πρόκειται για σφάλμα της εργασίας.
+            if (isStopped()) return;
+            console.log(error);
+            errorFound = true;
+            lastError = errorText(error);
+            bus.rowError(i, lastError);
+          });
+
+        if (isStopped()) break;
 
         // Στην περίπτωση σφάλματος πρέπει να σταματήσουμε την καταχώρηση
         if (errorFound) {
-          await page.screenshot({ path: "error.png", fullPage: true });
+          await page
+            .screenshot({ path: "error.png", fullPage: true })
+            .catch(() => undefined);
+          bus.screenshot(i, "error.png");
           console.log("Error!");
           break;
         }
         // });
       }
+
+      if (isStopped()) {
+        return { stopped: true };
+      }
       if (errorFound) {
-        return await Promise.reject();
+        return await Promise.reject(new Error(lastError ?? "Σφάλμα κατά την καταχώρηση"));
       }
 
-      return await Promise.resolve();
+      return { stopped: false };
     })
     .finally(() => {
       console.log("Τέλος");
