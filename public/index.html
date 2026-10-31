@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="el">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Τοποθετήσεις — Διεπαφή ελέγχου</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <h1>Τοποθετήσεις εκπαιδευτικών</h1>
+        <span id="message" class="message"></span>
+      </div>
+      <div class="controls">
+        <span id="state-badge" class="badge idle">Αδρανής</span>
+        <button id="btn-run" type="button">Εκκίνηση</button>
+        <button id="btn-stop" type="button" disabled>Διακοπή</button>
+        <span id="conn" class="conn off" title="Σύνδεση με τον διακομιστή"
+          >●</span
+        >
+      </div>
+    </header>
+
+    <main>
+      <section class="view">
+        <div id="placeholder" class="placeholder">
+          <p>Αναμονή για καρέ…</p>
+          <p class="hint">
+            Η ζωντανή προβολή εμφανίζεται μόλις ξεκινήσει η εργασία.
+          </p>
+        </div>
+        <img id="frame" alt="Ζωντανή προβολή της σελίδας" />
+      </section>
+
+      <aside class="sidebar">
+        <div class="side-head">
+          <h2>Πρόοδος</h2>
+          <span id="counts" class="counts"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ΑΜ/ΑΦΜ</th>
+                <th>ΣΧΟΛΕΙΟ</th>
+                <th>ΤΟΠΟΘΕΤΗΣΗ</th>
+                <th>Κατάσταση</th>
+                <th>Προεπισκόπηση</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <p id="empty" class="empty">
+            Δεν υπάρχει ενεργή εργασία. Πάτησε «Εκκίνηση» για να ξεκινήσει η
+            ανάγνωση του αρχείου <code>file.xlsx</code>.
+          </p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="logs">
+      <div class="logs-head">
+        <h2>Καταγραφή</h2>
+        <label
+          ><input type="checkbox" id="autoscroll" checked /> Αυτόματη
+          κύλιση</label
+        >
+        <button id="btn-clear" type="button">Καθαρισμός</button>
+      </div>
+      <div id="log-pane"></div>
+    </footer>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

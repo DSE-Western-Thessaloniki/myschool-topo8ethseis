@@ -1,11 +1,8 @@
 import dotenv from "dotenv";
 import consoleStamp from "console-stamp";
-import puppeteer from "puppeteer-core";
-import xlsx from "xlsx";
-import { default as start } from "./start.js";
-import type { XLSX_JSON } from "./types";
-
-const necessary_headers = ["ΑΜ/ΑΦΜ", "ΣΧΟΛΕΙΟ", "ΤΟΠΟΘΕΤΗΣΗ", "ΑΠΟ", "ΕΩΣ"];
+import { installLogger } from "./logger.js";
+import { runner } from "./runner.js";
+import { startServer } from "./ui/server.js";
 
 // Διάβασε τις ρυθμίσεις από το .env αρχείο
 dotenv.config();
@@ -13,126 +10,26 @@ dotenv.config();
 // Πρόσθεσε χρονοσφραγίδα στα μηνύματα του αρχείου καταγραφής
 consoleStamp(console);
 
-/**
- * Κάνει έλεγχο αν τα πεδία περιέχουν τις απαραίτητες στήλες για τις τοποθετήσεις
- *
- * @param {string[]} fields - Πίνακας με τις επικεφαλίδες που διαβάσαμε από το xlsx αρχείο.
- *
- * @returns {boolean} Επιστρέφει true αν έχει όλες τις απαραίτητες επικεφαλίδες αλλιώς false.
- */
-function necessary_fields_exist(fields: string[]) {
-  const found_cols = necessary_headers.slice();
+// Αιχμαλώτισε τα μηνύματα της κονσόλας για να εμφανίζονται ζωντανά στην
+// διεπαφή (πρέπει να γίνει μετά το consoleStamp, ώστε να μην καταγράφεται
+// η χρονοσφραγίδα δύο φορές)
+installLogger();
 
-  fields.forEach((field) => {
-    if (found_cols.includes(field)) {
-      found_cols.splice(found_cols.indexOf(field), 1);
-    }
-  });
+const port = Number(process.env.UI_PORT) || 8787;
+startServer(port);
 
-  if (found_cols.length) {
-    return false;
-  }
-  return true;
-}
+// Η εντολή `npm run start` εκτελεί αμέσως την εργασία (συμπεριφορά της
+// έκδοσης χωρίς διεπαφή). Η εντολή `npm run ui` ή το --no-run αφήνει την
+// διεπαφή έτοιμη χωρίς αυτόματη εκκίνηση.
+const noRun =
+  process.argv.includes("--no-run") || process.env.AUTO_RUN === "false";
 
-/**
- * Διαβάζει τα δεδομένα από το αρχείο xlsx
- *
- * @param {string} fileName - Το όνομα του αρχείου xlsx.
- *
- * @throws {Error} αν δεν υπάρχουν οι απαιτούμενες στήλες στο αρχείο.
- * @returns {XLSX_JSON[]} Επιστρέφει πίνακα με τα δεδομένα του αρχείου.
- */
-function getXlsxData(fileName: string): XLSX_JSON[] {
-  const workBook = xlsx.readFile(fileName, {
-    type: "binary",
-    cellDates: true,
-    dateNF: "dd/mm/yyyy",
-  });
-
-  /* πάρε το πρώτο φύλλο */
-  const workSheetName = workBook.SheetNames[0];
-  const workSheet = workBook.Sheets[workSheetName];
-
-  let xlsx_json: XLSX_JSON[] = JSON.parse(
-    JSON.stringify(
-      xlsx.utils.sheet_to_json(workSheet, {
-        defval: "",
-        raw: false,
-      })
-    ).replace(/"\s+|\s+"/g, '"')
+if (noRun) {
+  console.log(
+    "Η διεπαφή ετοιμάστηκε χωρίς αυτόματη εκκίνηση. Πάτησε «Εκκίνηση» στον browser."
   );
-  let headers = Object.keys(xlsx_json[0]);
-
-  if (!necessary_fields_exist(headers)) {
-    throw new Error(
-      "Δεν βρέθηκαν οι απαραίτητες στήλες: " + necessary_headers.join(", ")
-    );
-  }
-
-  console.log(xlsx_json);
-
-  return xlsx_json;
+} else {
+  runner.run().catch((err) => {
+    console.error(err);
+  });
 }
-
-(async () => {
-  console.log("Εκκίνηση νέας εργασίας");
-  console.log("Ανάγνωση xlsx αρχείου");
-  let xlsxData: XLSX_JSON[];
-
-  try {
-    xlsxData = getXlsxData("file.xlsx");
-  } catch (err) {
-    return Promise.reject(err);
-  }
-
-  console.log("Data", xlsxData);
-
-  console.log("Αρχικοποίηση σύνδεσης με τον φυλλομετρητή");
-  const browser = await puppeteer.connect({
-    // defaultViewport: { width: 1920, height: 1080 },
-    browserWSEndpoint: "ws://host.docker.internal:3000",
-    ignoreHTTPSErrors: true,
-  });
-  const page = await browser.newPage();
-
-  if (
-    process.env.SCRAPE_TEST_REMOTE_DEBUG &&
-    process.env.SCRAPE_TEST_REMOTE_DEBUG === "true"
-  ) {
-    // https://github.com/puppeteer/puppeteer/issues/5730
-    console.log(
-      "Remote debugging enabled, disabling touch events before click."
-    );
-
-    page.click = (function (originalMethod, context) {
-      return async function (...args) {
-        const CDPSession = await context.target().createCDPSession();
-        await CDPSession.send("Emulation.setEmitTouchEventsForMouse", {
-          enabled: false,
-        });
-        await CDPSession.send("Emulation.setTouchEmulationEnabled", {
-          enabled: false,
-        });
-        return originalMethod.apply(context, [...args]);
-      };
-    })(page.click, page);
-  }
-
-  await start({ page, xlsxData }).catch(async (err) => {
-    console.log(err);
-    await page.screenshot({ path: "error.png" });
-    return Promise.reject(err);
-  });
-
-  for (let page of await browser.pages()) {
-    await page.close();
-  }
-
-  const response = await browser.close();
-  return response;
-})()
-  .then(() => console.log("Η εργασία ολοκληρώθηκε!"))
-  .catch((err) => {
-    process.exit(1);
-  });
