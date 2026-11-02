@@ -23,6 +23,19 @@ const els = {
   counts: el<HTMLSpanElement>("counts"),
   logPane: el<HTMLDivElement>("log-pane"),
   autoscroll: el<HTMLInputElement>("autoscroll"),
+  /* Επιλογή αρχείου xlsx */
+  fileInput: el<HTMLInputElement>("xlsx-input"),
+  btnFile: el<HTMLButtonElement>("btn-file"),
+  fileStatus: el<HTMLSpanElement>("file-status"),
+  /* Ρυθμίσεις */
+  btnSettings: el<HTMLButtonElement>("btn-settings"),
+  settingsDialog: el<HTMLDialogElement>("settings-dialog"),
+  settingsForm: el<HTMLFormElement>("settings-form"),
+  setUsername: el<HTMLInputElement>("set-username"),
+  setPassword: el<HTMLInputElement>("set-password"),
+  settingsHint: el<HTMLElement>("settings-hint"),
+  settingsError: el<HTMLElement>("settings-error"),
+  settingsCancel: el<HTMLButtonElement>("btn-settings-cancel"),
 };
 
 const stateLabels: Record<RunState, string> = {
@@ -270,6 +283,186 @@ function connect(): void {
   };
 }
 
+/* ---------------- Αρχείο xlsx ---------------- */
+
+type FileStatusKind = "idle" | "ok" | "error" | "pending";
+
+function setFileStatus(text: string, kind: FileStatusKind): void {
+  els.fileStatus.textContent = text;
+  els.fileStatus.className = "file-status " + kind;
+}
+
+type XlsxState = {
+  selected: boolean;
+  name?: string;
+  rowCount?: number;
+  /** Υπάρχει το file.xlsx της ρίζας (συμπεριφορά της ανάπτυξης) */
+  fallback: boolean;
+};
+
+function renderFileState(state: XlsxState): void {
+  if (state.selected) {
+    setFileStatus(
+      `✓ «${state.name}» — ${state.rowCount} γραμμές, όλες οι απαιτούμενες στήλες`,
+      "ok"
+    );
+    return;
+  }
+  if (state.fallback) {
+    setFileStatus("Θα χρησιμοποιηθεί το file.xlsx", "idle");
+    return;
+  }
+  setFileStatus("Δεν έχει επιλεγεί αρχείο", "idle");
+}
+
+async function loadFileState(): Promise<void> {
+  try {
+    const response = await fetch("/api/xlsx");
+    if (!response.ok) return;
+    renderFileState((await response.json()) as XlsxState);
+  } catch {
+    // Η σύνδεση θα επανέλθει μόνη της
+  }
+}
+
+async function uploadXlsx(file: File): Promise<void> {
+  setFileStatus("Ανάγνωση του αρχείου…", "pending");
+  try {
+    const response = await fetch(
+      `/api/xlsx?name=${encodeURIComponent(file.name)}`,
+      {
+        method: "POST",
+        body: file,
+        headers: { "Content-Type": "application/octet-stream" },
+      }
+    );
+    const body = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+      name?: string;
+      rowCount?: number;
+    } | null;
+
+    if (!response.ok || !body?.ok) {
+      setFileStatus(
+        "✗ " + (body?.error ?? "Αποτυχία ανάγνωσης αρχείου"),
+        "error"
+      );
+      return;
+    }
+    setFileStatus(
+      `✓ «${body.name}» — ${body.rowCount} γραμμές, όλες οι απαιτούμενες στήλες`,
+      "ok"
+    );
+  } catch {
+    setFileStatus("✗ Δεν υπάρχει σύνδεση με τον διακομιστή", "error");
+  }
+}
+
+els.btnFile.addEventListener("click", () => els.fileInput.click());
+
+els.fileInput.addEventListener("change", () => {
+  const file = els.fileInput.files?.[0];
+  if (file) {
+    void uploadXlsx(file);
+  }
+  // Επιτρέπει την επιλογή του ίδιου αρχείου ξανά μετά από αποτυχία
+  els.fileInput.value = "";
+});
+
+/* ---------------- Ρυθμίσεις ---------------- */
+
+type SettingsInfo = {
+  username: string;
+  hasPassword: boolean;
+  source: "settings" | "env" | "none";
+  encryption: "os-keychain" | "plain";
+  path?: string;
+};
+
+const sourceLabels: Record<SettingsInfo["source"], string> = {
+  settings: "Αποθηκευμένα στις ρυθμίσεις",
+  env: "Προέρχονται από το αρχείο .env",
+  none: "Δεν έχουν οριστεί στοιχεία σύνδεσης",
+};
+
+function renderSettings(info: SettingsInfo): void {
+  els.setUsername.value = info.username;
+  els.setPassword.value = "";
+  els.setPassword.placeholder = info.hasPassword
+    ? "Άφησέ το κενό για να μην αλλάξει"
+    : "Συμπλήρωσε τον κωδικό";
+
+  const parts = [sourceLabels[info.source]];
+  if (info.source === "settings") {
+    parts.push(
+      info.encryption === "os-keychain"
+        ? "κρυπτογραφημένα στο κλειδοθήκη του συστήματος"
+        : "απλό κείμενο (δεν βρέθηκε κλειδοθήκης)"
+    );
+  }
+  if (info.path) {
+    parts.push(info.path);
+  }
+  els.settingsHint.textContent = parts.join(" · ");
+}
+
+async function loadSettings(): Promise<void> {
+  try {
+    const response = await fetch("/api/settings");
+    if (!response.ok) return;
+    renderSettings((await response.json()) as SettingsInfo);
+  } catch {
+    // Η σύνδεση θα επανέλθει μόνη της
+  }
+}
+
+function showSettingsError(message: string): void {
+  els.settingsError.textContent = message;
+  els.settingsError.classList.toggle("hidden", !message);
+}
+
+els.btnSettings.addEventListener("click", () => {
+  showSettingsError("");
+  void loadSettings().then(() => els.settingsDialog.showModal());
+});
+
+els.settingsCancel.addEventListener("click", () => {
+  els.settingsDialog.close();
+});
+
+els.settingsForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  showSettingsError("");
+  void fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: els.setUsername.value,
+      password: els.setPassword.value,
+    }),
+  })
+    .then(async (response) => {
+      const body = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+        info?: SettingsInfo;
+      } | null;
+      if (!response.ok || !body?.ok) {
+        showSettingsError(body?.error ?? "Αποτυχία αποθήκευσης");
+        return;
+      }
+      if (body.info) {
+        renderSettings(body.info);
+      }
+      els.settingsDialog.close();
+    })
+    .catch(() => showSettingsError("Δεν υπάρχει σύνδεση με τον διακομιστή"));
+});
+
+// Το Esc κλείνει το παράθυρο χωρίς αποθήκευση
+els.settingsDialog.addEventListener("cancel", () => showSettingsError(""));
+
 /* ---------------- Ενέργειες ---------------- */
 
 async function post(url: string): Promise<void> {
@@ -297,5 +490,9 @@ els.stop.addEventListener("click", () => {
 });
 
 els.clear.addEventListener("click", clearLogs);
+
+// Φόρτωσε την τρέχουσα κατάσταση (ρυθμίσεις και επιλεγμένο αρχείο)
+void loadSettings();
+void loadFileState();
 
 connect();
