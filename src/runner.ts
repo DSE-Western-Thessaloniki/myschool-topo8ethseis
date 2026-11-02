@@ -1,73 +1,59 @@
+import fs from "node:fs";
+import path from "node:path";
 import puppeteer from "puppeteer-core";
 import type { Browser, Page } from "puppeteer-core";
-import xlsx from "xlsx";
 import { bus } from "./bus.js";
 import { errorText } from "./errors.js";
+import { errorShotPath, rootDir } from "./paths.js";
 import { attachScreencast } from "./screencast.js";
 import type { ScreencastHandle } from "./screencast.js";
 import { default as start } from "./start.js";
 import type { XLSX_JSON } from "./types";
+import { getSelectedFile, parseXlsx } from "./xlsx.js";
 
-const necessary_headers = ["ΑΜ/ΑΦΜ", "ΣΧΟΛΕΙΟ", "ΤΟΠΟΘΕΤΗΣΗ", "ΑΠΟ", "ΕΩΣ"];
+/** Παραγωγή της σελίδας που θα ελέγξει η εργασία */
+export type PageFactory = (browser: Browser) => Promise<Page>;
+
+let pageFactory: PageFactory | undefined;
 
 /**
- * Κάνει έλεγχο αν τα πεδία περιέχουν τις απαραίτητες στήλες για τις τοποθετήσεις
+ * Ορίζει πώς δημιουργείται η σελίδα εργασίας.
  *
- * @param {string[]} fields - Πίνακας με τις επικεφαλίδες που διαβάσαμε από το xlsx αρχείο.
+ * Στην εφαρμογή επιφάνειας εργασίας το Target.createTarget του CDP δεν
+ * υποστηρίζεται από τον Electron, οπότε το παράθυρο πρέπει να δημιουργήσει
+ * ο κύριος κώδικας του Electron και εμείς να το βρούμε μέσω CDP. Στο dev
+ * container παραμένει η προεπιλογή (browser.newPage()).
  *
- * @returns {boolean} Επιστρέφει true αν έχει όλες τις απαραίτητες επικεφαλίδες αλλιώς false.
+ * @param {PageFactory | undefined} factory - Η νέα συνάρτηση ή undefined.
+ *
+ * @returns {void}
  */
-function necessary_fields_exist(fields: string[]): boolean {
-  const found_cols = necessary_headers.slice();
-
-  fields.forEach((field) => {
-    if (found_cols.includes(field)) {
-      found_cols.splice(found_cols.indexOf(field), 1);
-    }
-  });
-
-  if (found_cols.length) {
-    return false;
-  }
-  return true;
+export function setPageFactory(factory: PageFactory | undefined): void {
+  pageFactory = factory;
 }
 
 /**
- * Διαβάζει τα δεδομένα από το αρχείο xlsx
+ * Διαβάζει τα δεδομένα από το αρχείο που επέλεξε ο χρήστης από τη διεπαφή.
  *
- * @param {string} fileName - Το όνομα του αρχείου xlsx.
+ * Αν δεν έχει επιλεγεί αρχείο (συμπεριφορά της ανάπτυξης μέσα στο dev
+ * container) χρησιμοποιείται το file.xlsx της ρίζας του project.
  *
- * @throws {Error} αν δεν υπάρχουν οι απαιτούμενες στήλες στο αρχείο.
- * @returns {XLSX_JSON[]} Επιστρέφει πίνακα με τα δεδομένα του αρχείου.
+ * @throws {Error} αν δεν υπάρχει κανένα αρχείο ή λείπουν στήλες.
+ * @returns {XLSX_JSON[]} Οι γραμμές του αρχείου.
  */
-function getXlsxData(fileName: string): XLSX_JSON[] {
-  const workBook = xlsx.readFile(fileName, {
-    type: "binary",
-    cellDates: true,
-    dateNF: "dd/mm/yyyy",
-  });
-
-  /* πάρε το πρώτο φύλλο */
-  const workSheetName = workBook.SheetNames[0];
-  const workSheet = workBook.Sheets[workSheetName];
-
-  const xlsx_json: XLSX_JSON[] = JSON.parse(
-    JSON.stringify(
-      xlsx.utils.sheet_to_json(workSheet, {
-        defval: "",
-        raw: false,
-      })
-    ).replace(/"\s+|\s+"/g, '"')
-  );
-  const headers = Object.keys(xlsx_json[0]);
-
-  if (!necessary_fields_exist(headers)) {
-    throw new Error(
-      "Δεν βρέθηκαν οι απαραίτητες στήλες: " + necessary_headers.join(", ")
-    );
+function loadXlsxData(): XLSX_JSON[] {
+  const selected = getSelectedFile();
+  if (selected) {
+    console.log(`Ανάγνωση του επιλεγμένου αρχείου «${selected.name}»`);
+    return selected.rows;
   }
 
-  return xlsx_json;
+  const fallback = path.join(rootDir, "file.xlsx");
+  if (!fs.existsSync(fallback)) {
+    throw new Error("Δεν επιλέχτηκε αρχείο xlsx και δεν βρέθηκε το file.xlsx");
+  }
+  console.log("Ανάγνωση xlsx αρχείου (file.xlsx)");
+  return parseXlsx(fs.readFileSync(fallback)).rows;
 }
 
 /** Τα στοιχεία μιας εκτελούμενης εργασίας */
@@ -109,8 +95,7 @@ class Runner {
 
     let xlsxData: XLSX_JSON[];
     try {
-      console.log("Ανάγνωση xlsx αρχείου");
-      xlsxData = getXlsxData("file.xlsx");
+      xlsxData = loadXlsxData();
       console.log("Data", xlsxData);
     } catch (err) {
       this.fail(err);
@@ -123,13 +108,23 @@ class Runner {
 
     try {
       console.log("Αρχικοποίηση σύνδεσης με τον φυλλομετρητή");
+      const endpoint =
+        process.env.BROWSER_WS_ENDPOINT || "ws://host.docker.internal:3000";
+      // Στην εφαρμογή το endpoint είναι το http του CDP του ίδιο του
+      // Electron. Εκεί η σελίδα έχει ήδη το μέγεθος του παραθύρου της,
+      // οπότε δεν επιβάλλουμε τακτικό viewport.
+      const isHttp =
+        endpoint.startsWith("http://") || endpoint.startsWith("https://");
       const browser = await puppeteer.connect({
-        browserWSEndpoint:
-          process.env.BROWSER_WS_ENDPOINT || "ws://host.docker.internal:3000",
-        ignoreHTTPSErrors: true,
+        ...(isHttp
+          ? { browserURL: endpoint, defaultViewport: null }
+          : { browserWSEndpoint: endpoint }),
+        acceptInsecureCerts: true,
       });
       this.activeBrowser = browser;
-      const page = await browser.newPage();
+      const page = pageFactory
+        ? await pageFactory(browser)
+        : await browser.newPage();
       this.activePage = page;
 
       // Ζωντανή προβολή της σελίδας στην διεπαφή
@@ -141,7 +136,7 @@ class Runner {
       ) {
         // https://github.com/puppeteer/puppeteer/issues/5730
         console.log(
-          "Remote debugging enabled, disabling touch events before click."
+          "Remote debugging enabled, disabling touch events before click.",
         );
 
         page.click = (function (originalMethod, context) {
@@ -217,7 +212,7 @@ class Runner {
     this.lastFrame = Date.now();
     try {
       const data = await page.screenshot({ type: "jpeg", quality: 50 });
-      bus.frame(data.toString("base64"));
+      bus.frame(Buffer.from(data).toString("base64"));
     } catch {
       // Η σελίδα έκλεισε εντωμεταξύ
     }
@@ -233,7 +228,7 @@ class Runner {
     const page = this.activePage;
     if (!page) return;
     try {
-      await page.screenshot({ path: "error.png", fullPage: true });
+      await page.screenshot({ path: errorShotPath(), fullPage: true });
       console.log("Αποθηκεύτηκε στιγμιότυπο σφάλματος στο error.png");
     } catch {
       console.warn("Δεν ήταν δυνατή η λήψη στιγμιότυπου σφάλματος");
@@ -246,14 +241,23 @@ class Runner {
       this.cast = null;
     }
     const browser = this.activeBrowser;
+    const page = this.activePage;
     this.activeBrowser = null;
     this.activePage = null;
+    // Κλείσε μόνο τη σελίδα που δημιουργήσαμε εμείς. Στην εφαρμογή τα
+    // υπόλοιπα παράθυρα (π.χ. η διεπαφή ελέγχου) πρέπει να μείνουν ανοιχτά.
+    if (page) {
+      await page.close().catch(() => undefined);
+    }
     if (!browser) return;
     try {
-      for (const page of await browser.pages()) {
-        await page.close().catch(() => undefined);
+      if (pageFactory) {
+        // Ο «φυλλομετρητής» είναι το ίδιο το Electron: το close θα
+        // τερμάτιζε την εφαρμογή, οπότε απλώς αποσυνδεόμαστε.
+        browser.disconnect();
+      } else {
+        await browser.close();
       }
-      await browser.close();
     } catch {
       // Η σύνδεση έχει ήδη κλείσει
     }

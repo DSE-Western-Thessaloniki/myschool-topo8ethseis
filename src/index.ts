@@ -16,7 +16,10 @@ consoleStamp(console);
 installLogger();
 
 const port = Number(process.env.UI_PORT) || 8787;
-startServer(port);
+startServer(port).catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
 
 // Η εντολή `npm run start` εκτελεί αμέσως την εργασία (συμπεριφορά της
 // έκδοσης χωρίς διεπαφή). Η εντολή `npm run ui` ή το --no-run αφήνει την

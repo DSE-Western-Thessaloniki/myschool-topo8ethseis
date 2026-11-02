@@ -1,6 +1,9 @@
+import path from "node:path";
 import type { Page } from "puppeteer-core";
 import { bus } from "./bus.js";
 import { errorText } from "./errors.js";
+import { errorShotPath, imgDir } from "./paths.js";
+import { getCredentials } from "./settings.js";
 import type { XLSX_JSON } from "./types";
 
 async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
@@ -366,13 +369,14 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
     })
     .then(async () => {
       console.log("Αποθήκευσε την τοποθέτηση");
-      const shotFile = "img/" + record["ΑΜ/ΑΦΜ"] + ".png";
+      const shotFile = path.join(imgDir(), record["ΑΜ/ΑΦΜ"] + ".png");
       await page.screenshot({
         path: shotFile,
         fullPage: true,
       });
-      // Στείλε το στιγμιότυπο στην διεπαφή ώστε να εμφανιστεί δίπλα από την γραμμή
-      bus.screenshot(index, shotFile);
+      // Στείλε μόνο το όνομα του αρχείου, ώστε η διεπαφή να χτίζει μόνη
+      // της το URL προβολής του στιγμιότυπου
+      bus.screenshot(index, path.basename(shotFile));
       // return Promise.resolve();
       return await Promise.all([
         page.click("#ctl00_ContentData_savePlacement"),
@@ -402,25 +406,23 @@ export default async function start({
   console.log("Εμφάνισε αρχική σελίδα");
   await page.goto("https://app.myschool.sch.gr", { waitUntil: "networkidle2" });
 
-  if (
-    typeof process.env.MYSCH_USERNAME === "undefined" ||
-    typeof process.env.MYSCH_PASSWORD === "undefined"
-  ) {
+  const credentials = await getCredentials();
+  if (!credentials.username || !credentials.password) {
     console.log("MYSCH_USERNAME και MYSCH_PASSWORD είναι κενά!");
     return { stopped: false };
   }
   await page.waitForSelector("#username");
   await page.waitForSelector("#password");
-  await page.type("#username", process.env.MYSCH_USERNAME);
-  await page.type("#password", process.env.MYSCH_PASSWORD);
+  await page.type("#username", credentials.username);
+  await page.type("#password", credentials.password);
   console.log("Κάνε login");
   await Promise.all([page.click("#loginButton"), page.waitForNavigation()]);
   console.log("Κάνε logout");
   await Promise.all([page.click("li.logout > a"), page.waitForNavigation()]);
   await page.waitForSelector("#username");
   await page.waitForSelector("#password");
-  await page.type("#username", process.env.MYSCH_USERNAME);
-  await page.type("#password", process.env.MYSCH_PASSWORD);
+  await page.type("#username", credentials.username);
+  await page.type("#password", credentials.password);
   console.log("Κάνε login");
   await Promise.all([page.click("#loginButton"), page.waitForNavigation()]);
 
@@ -504,7 +506,7 @@ export default async function start({
         // Στην περίπτωση σφάλματος πρέπει να σταματήσουμε την καταχώρηση
         if (errorFound) {
           await page
-            .screenshot({ path: "error.png", fullPage: true })
+            .screenshot({ path: errorShotPath(), fullPage: true })
             .catch(() => undefined);
           bus.screenshot(i, "error.png");
           console.log("Error!");

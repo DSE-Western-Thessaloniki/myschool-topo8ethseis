@@ -22,6 +22,26 @@
       </div>
     </header>
 
+    <div class="toolbar">
+      <div class="file-picker">
+        <input
+          type="file"
+          id="xlsx-input"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          hidden
+        />
+        <button id="btn-file" type="button">Επιλογή αρχείου xlsx</button>
+        <span id="file-status" class="file-status"></span>
+      </div>
+      <button
+        id="btn-settings"
+        type="button"
+        title="Στοιχεία σύνδεσης στο σύστημα myschool"
+      >
+        Ρυθμίσεις
+      </button>
+    </div>
+
     <main>
       <section class="view">
         <div id="placeholder" class="placeholder">
@@ -52,8 +72,8 @@
             <tbody id="rows"></tbody>
           </table>
           <p id="empty" class="empty">
-            Δεν υπάρχει ενεργή εργασία. Πάτησε «Εκκίνηση» για να ξεκινήσει η
-            ανάγνωση του αρχείου <code>file.xlsx</code>.
+            Δεν υπάρχει ενεργή εργασία. Επίλεξε ένα αρχείο xlsx και πάτησε
+            «Εκκίνηση».
           </p>
         </div>
       </aside>
@@ -70,6 +90,31 @@
       </div>
       <div id="log-pane"></div>
     </footer>
+
+    <dialog id="settings-dialog">
+      <form id="settings-form">
+        <h2>Ρυθμίσεις</h2>
+        <label class="field">
+          Όνομα χρήστη
+          <input type="text" id="set-username" autocomplete="username" />
+        </label>
+        <label class="field">
+          Κωδικός
+          <input
+            type="password"
+            id="set-password"
+            autocomplete="current-password"
+            placeholder="Άφησέ το κενό για να μην αλλάξει"
+          />
+        </label>
+        <p id="settings-hint" class="hint"></p>
+        <p id="settings-error" class="dialog-error hidden"></p>
+        <div class="dialog-actions">
+          <button type="button" id="btn-settings-cancel">Ακύρωση</button>
+          <button type="submit" id="btn-settings-save">Αποθήκευση</button>
+        </div>
+      </form>
+    </dialog>
 
     <script type="module" src="/app.js"></script>
   </body>

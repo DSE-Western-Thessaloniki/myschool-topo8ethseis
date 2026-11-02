@@ -99,5 +99,6 @@
   "include": [
     "src/**/*.ts",
     "public/**/*.ts",
+    "desktop/**/*.ts",
   ]
 }
