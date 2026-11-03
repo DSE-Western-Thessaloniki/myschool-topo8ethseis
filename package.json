@@ -1,6 +1,6 @@
 {
   "name": "myschool-topo8ethseis",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Αυτοματοποίηση τοποθετήσεων εκπαιδευτικών στο σύστημα myschool",
   "main": "dist/desktop/main.js",
   "type": "module",
