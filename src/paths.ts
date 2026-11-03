@@ -40,6 +40,15 @@ export function errorShotPath(): string {
 }
 
 /**
+ * Αρχείο προτύπου xlsx που διατίθεται από τη διεπαφή.
+ *
+ * @returns {string} Η απόλυτη διαδρομή του αρχείου προτύπου.
+ */
+export function templatePath(): string {
+  return process.env.MYSCH_TEMPLATE_PATH || path.join(rootDir, "template.xlsx");
+}
+
+/**
  * Δημιουργεί τους απαραίτητους φακέλους (img/) αν δεν υπάρχουν ήδη.
  *
  * @returns {void}

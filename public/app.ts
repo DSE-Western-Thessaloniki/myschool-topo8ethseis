@@ -27,6 +27,8 @@ const els = {
   fileInput: el<HTMLInputElement>("xlsx-input"),
   btnFile: el<HTMLButtonElement>("btn-file"),
   fileStatus: el<HTMLSpanElement>("file-status"),
+  templateDownload: el<HTMLAnchorElement>("template-download"),
+  templateOpen: el<HTMLButtonElement>("template-open"),
   /* Ρυθμίσεις */
   btnSettings: el<HTMLButtonElement>("btn-settings"),
   settingsDialog: el<HTMLDialogElement>("settings-dialog"),
@@ -66,7 +68,7 @@ function pad(value: number): string {
 function formatTime(time: number): string {
   const date = new Date(time);
   return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
-    date.getSeconds()
+    date.getSeconds(),
   )}`;
 }
 
@@ -305,7 +307,7 @@ function renderFileState(state: XlsxState): void {
   if (state.selected) {
     setFileStatus(
       `✓ «${state.name}» — ${state.rowCount} γραμμές, όλες οι απαιτούμενες στήλες`,
-      "ok"
+      "ok",
     );
     return;
   }
@@ -326,6 +328,18 @@ async function loadFileState(): Promise<void> {
   }
 }
 
+async function loadTemplateAccess(): Promise<void> {
+  try {
+    const response = await fetch("/api/template");
+    if (!response.ok) return;
+    const info = (await response.json()) as { desktop: boolean };
+    els.templateDownload.hidden = info.desktop;
+    els.templateOpen.hidden = !info.desktop;
+  } catch {
+    // Η σύνδεση θα επανέλθει μόνη της
+  }
+}
+
 async function uploadXlsx(file: File): Promise<void> {
   setFileStatus("Ανάγνωση του αρχείου…", "pending");
   try {
@@ -335,7 +349,7 @@ async function uploadXlsx(file: File): Promise<void> {
         method: "POST",
         body: file,
         headers: { "Content-Type": "application/octet-stream" },
-      }
+      },
     );
     const body = (await response.json().catch(() => null)) as {
       ok?: boolean;
@@ -347,13 +361,13 @@ async function uploadXlsx(file: File): Promise<void> {
     if (!response.ok || !body?.ok) {
       setFileStatus(
         "✗ " + (body?.error ?? "Αποτυχία ανάγνωσης αρχείου"),
-        "error"
+        "error",
       );
       return;
     }
     setFileStatus(
       `✓ «${body.name}» — ${body.rowCount} γραμμές, όλες οι απαιτούμενες στήλες`,
-      "ok"
+      "ok",
     );
   } catch {
     setFileStatus("✗ Δεν υπάρχει σύνδεση με τον διακομιστή", "error");
@@ -399,7 +413,7 @@ function renderSettings(info: SettingsInfo): void {
     parts.push(
       info.encryption === "os-keychain"
         ? "κρυπτογραφημένα στο κλειδοθήκη του συστήματος"
-        : "απλό κείμενο (δεν βρέθηκε κλειδοθήκης)"
+        : "απλό κείμενο (δεν βρέθηκε κλειδοθήκης)",
     );
   }
   if (info.path) {
@@ -441,7 +455,7 @@ function showSettingsError(message: string): void {
 els.btnSettings.addEventListener("click", () => {
   showSettingsError("");
   void Promise.all([loadSettings(), loadPreferences()]).then(() =>
-    els.settingsDialog.showModal()
+    els.settingsDialog.showModal(),
   );
 });
 
@@ -522,9 +536,13 @@ els.stop.addEventListener("click", () => {
 });
 
 els.clear.addEventListener("click", clearLogs);
+els.templateOpen.addEventListener("click", () => {
+  void post("/api/template/open");
+});
 
 // Φόρτωσε την τρέχουσα κατάσταση (ρυθμίσεις και επιλεγμένο αρχείο)
 void loadSettings();
 void loadFileState();
+void loadTemplateAccess();
 
 connect();

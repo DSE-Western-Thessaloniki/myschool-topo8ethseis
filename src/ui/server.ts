@@ -5,7 +5,13 @@ import express from "express";
 import { WebSocket, WebSocketServer } from "ws";
 import { bus, subscribe } from "../bus.js";
 import { errorText } from "../errors.js";
-import { ensureDataDirs, errorShotPath, imgDir, rootDir } from "../paths.js";
+import {
+  ensureDataDirs,
+  errorShotPath,
+  imgDir,
+  rootDir,
+  templatePath,
+} from "../paths.js";
 import { runner } from "../runner.js";
 import {
   describeCredentials,
@@ -82,6 +88,38 @@ export function startServer(port: number): Promise<number> {
 
   app.get("/api/status", (_req, res) => {
     res.json(bus.snapshot());
+  });
+
+  app.get("/api/template", (_req, res) => {
+    res.json({ desktop: typeof process.versions.electron === "string" });
+  });
+
+  app.get("/template.xlsx", (_req, res) => {
+    if (typeof process.versions.electron === "string") {
+      res.sendStatus(404);
+      return;
+    }
+    const file = path.join(rootDir, "template.xlsx");
+    if (!fs.existsSync(file)) {
+      res.sendStatus(404);
+      return;
+    }
+    res.download(file, "template.xlsx");
+  });
+
+  app.post("/api/template/open", async (_req, res) => {
+    if (typeof process.versions.electron !== "string") {
+      res.sendStatus(404);
+      return;
+    }
+    const file = templatePath();
+    if (!fs.existsSync(file)) {
+      res.status(404).json({ error: "Δεν βρέθηκε το πρότυπο xlsx" });
+      return;
+    }
+    const { shell } = await import("electron");
+    shell.showItemInFolder(file);
+    res.json({ ok: true });
   });
 
   /* ---------------- Ρυθμίσεις ---------------- */

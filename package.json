@@ -53,6 +53,12 @@
       "!**/*.log",
       "!**/img/**"
     ],
+    "extraResources": [
+      {
+        "from": "template.xlsx",
+        "to": "template.xlsx"
+      }
+    ],
     "linux": {
       "target": [
         "AppImage",

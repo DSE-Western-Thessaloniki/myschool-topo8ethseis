@@ -1,7 +1,10 @@
 import net from "node:net";
+import fs from "node:fs";
+import path from "node:path";
 import { app, BrowserWindow } from "electron";
 import consoleStamp from "console-stamp";
 import { installLogger } from "../src/logger.js";
+import { rootDir } from "../src/paths.js";
 import { getPreferences, onPreferencesChanged } from "../src/preferences.js";
 import { runner, setPageFactory } from "../src/runner.js";
 import { startServer } from "../src/ui/server.js";
@@ -69,6 +72,15 @@ async function main(): Promise<void> {
 
   // Ρυθμίσεις και στιγμιότυπα σε εγγράψιμο φάκελο δεδομένων εκτός του asar
   process.env.MYSCH_DATA_DIR = app.getPath("userData");
+  const localTemplatePath = path.join(app.getPath("userData"), "template.xlsx");
+  if (!fs.existsSync(localTemplatePath)) {
+    const packagedTemplatePath = path.join(
+      app.isPackaged ? process.resourcesPath : rootDir,
+      "template.xlsx",
+    );
+    fs.copyFileSync(packagedTemplatePath, localTemplatePath);
+  }
+  process.env.MYSCH_TEMPLATE_PATH = localTemplatePath;
   // Ο φυλλομετρητής εργασίας είναι το ίδιο το Chromium της εφαρμογής
   process.env.BROWSER_WS_ENDPOINT = `http://127.0.0.1:${debugPort}`;
 
