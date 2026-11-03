@@ -389,6 +389,13 @@ code {
   min-width: 0;
 }
 
+.file-picker.drag-over {
+  border-radius: 6px;
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  background: var(--panel-2);
+}
+
 .file-status {
   color: var(--muted);
   font-size: 12.5px;

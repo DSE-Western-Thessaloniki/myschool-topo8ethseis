@@ -24,6 +24,7 @@ const els = {
   logPane: el<HTMLDivElement>("log-pane"),
   autoscroll: el<HTMLInputElement>("autoscroll"),
   /* Επιλογή αρχείου xlsx */
+  filePicker: el<HTMLDivElement>("file-picker"),
   fileInput: el<HTMLInputElement>("xlsx-input"),
   btnFile: el<HTMLButtonElement>("btn-file"),
   fileStatus: el<HTMLSpanElement>("file-status"),
@@ -374,15 +375,56 @@ async function uploadXlsx(file: File): Promise<void> {
   }
 }
 
+function selectXlsxFile(file: File): void {
+  if (!file.name.toLowerCase().endsWith(".xlsx")) {
+    setFileStatus("✗ Επιτρέπονται αρχεία .xlsx", "error");
+    return;
+  }
+  void uploadXlsx(file);
+}
+
 els.btnFile.addEventListener("click", () => els.fileInput.click());
 
 els.fileInput.addEventListener("change", () => {
   const file = els.fileInput.files?.[0];
   if (file) {
-    void uploadXlsx(file);
+    selectXlsxFile(file);
   }
   // Επιτρέπει την επιλογή του ίδιου αρχείου ξανά μετά από αποτυχία
   els.fileInput.value = "";
+});
+
+let fileDragDepth = 0;
+
+els.filePicker.addEventListener("dragenter", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  fileDragDepth++;
+  els.filePicker.classList.add("drag-over");
+});
+
+els.filePicker.addEventListener("dragover", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+});
+
+els.filePicker.addEventListener("dragleave", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  fileDragDepth = Math.max(0, fileDragDepth - 1);
+  if (fileDragDepth === 0) {
+    els.filePicker.classList.remove("drag-over");
+  }
+});
+
+els.filePicker.addEventListener("drop", (event) => {
+  event.preventDefault();
+  fileDragDepth = 0;
+  els.filePicker.classList.remove("drag-over");
+  const file = event.dataTransfer?.files[0];
+  if (file) {
+    selectXlsxFile(file);
+  }
 });
 
 /* ---------------- Ρυθμίσεις ---------------- */
