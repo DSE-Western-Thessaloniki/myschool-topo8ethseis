@@ -12,6 +12,7 @@ import {
   getCredentials,
   saveCredentials,
 } from "../settings.js";
+import { getPreferences, setPreferences } from "../preferences.js";
 import { getSelectedFile, parseXlsx, setSelectedFile } from "../xlsx.js";
 
 /** Ρίζα του project (dist/src/ui/server.js → ../../../) */
@@ -34,11 +35,15 @@ function shotsHandler(req: express.Request, res: express.Response): void {
   }
   const target =
     file === "error.png" ? errorShotPath() : path.join(imgDir(), file);
-  res.sendFile(target, (err) => {
-    if (err) {
-      res.sendStatus(404);
-    }
-  });
+  res.sendFile(
+    target,
+    { dotfiles: "allow" /* Express 5: preserve v4 behavior */ },
+    (err) => {
+      if (err) {
+        res.sendStatus(404);
+      }
+    },
+  );
 }
 
 /**
@@ -58,8 +63,8 @@ export function startServer(port: number): Promise<number> {
 
   // Τα στατικά της διεπαφής (index.html, styles.css) και ο κώδικας που
   // μεταγλωττίστηκε από public/app.ts σε dist/public/app.js
-  app.use(express.static(publicDir));
-  app.use(express.static(compiledPublicDir));
+  app.use(express.static(publicDir, { dotfiles: "deny" }));
+  app.use(express.static(compiledPublicDir, { dotfiles: "deny" }));
 
   app.get("/shots/:file", shotsHandler);
 
@@ -115,6 +120,28 @@ export function startServer(port: number): Promise<number> {
       .catch((err) => {
         res.status(500).json({ error: errorText(err) });
       });
+  });
+
+  /* ---------------- Προτιμήσεις (debug) ---------------- */
+
+  app.get("/api/preferences", (_req, res) => {
+    res.json(getPreferences());
+  });
+
+  app.post("/api/preferences", express.json(), (req, res) => {
+    const body = req.body as { debugShowAutomation?: unknown };
+    if (typeof body?.debugShowAutomation !== "boolean") {
+      res.status(400).json({ error: "Μη έγκυρη προτίμηση" });
+      return;
+    }
+    try {
+      const preferences = setPreferences({
+        debugShowAutomation: body.debugShowAutomation,
+      });
+      res.json({ ok: true, preferences });
+    } catch (err) {
+      res.status(500).json({ error: errorText(err) });
+    }
   });
 
   /* ---------------- Αρχείο xlsx ---------------- */

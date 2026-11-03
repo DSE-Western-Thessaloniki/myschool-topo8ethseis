@@ -2,11 +2,15 @@ import net from "node:net";
 import { app, BrowserWindow } from "electron";
 import consoleStamp from "console-stamp";
 import { installLogger } from "../src/logger.js";
+import { getPreferences, onPreferencesChanged } from "../src/preferences.js";
 import { runner, setPageFactory } from "../src/runner.js";
 import { startServer } from "../src/ui/server.js";
 
 /** Παράθυρο με τη διεπαφή ελέγχου */
 let controlWindow: BrowserWindow | null = null;
+
+/** Το τρέχον (κρυφό) παράθυρο εργασίας, ώστε να εφαρμόζεται άμεσα η ρύθμιση debug */
+let automationWindow: BrowserWindow | null = null;
 
 /**
  * Βρίσκει μια ελεύθερη θύρα για το remote debugging του Chromium.
@@ -70,7 +74,7 @@ async function main(): Promise<void> {
 
   // Ίδια συμπεριφορά με το src/index.ts: χρονοσφραγίδα στην κονσόλα και
   // αιχμαλώτιση των μηνυμάτων για τη ζωντανή προβολή στη διεπαφή
-  consoleStamp(console);
+  (consoleStamp as unknown as (target: Console) => void)(console);
   installLogger();
 
   const port = await startServer(0);
@@ -79,22 +83,50 @@ async function main(): Promise<void> {
   // παράθυρο εργασίας το δημιουργούμε εμείς και το «βρούμε» μέσω CDP.
   setPageFactory(async (browser) => {
     const marker = `http://127.0.0.1:${port}/automation?run=${Date.now()}`;
+    // Από προεπιλογή το παράθυρο εργασίας είναι κρυφό, ώστε ο χρήστης να
+    // μην μπορεί να πατήσει/πληκτρολογήσει μέσα του και να ανακατέψει την
+    // εκτέλεση. Με τη ρύθμιση debug στις «Ρυθμίσεις» εμφανίζεται κανονικά.
     const automation = new BrowserWindow({
       width: 1280,
       height: 900,
-      show: false,
+      show: getPreferences().debugShowAutomation,
       autoHideMenuBar: true,
+      webPreferences: {
+        // Το κρυφό παράθυρο πρέπει να συνεχίζει να αποδίδει, ώστε να
+        // παράγονται καρέ για τη ζωντανή προβολή στη διεπαφή και να
+        // λειτουργούν οι αναμονές (waitForSelector κ.λπ.) της εργασίας.
+        backgroundThrottling: false,
+      },
+    });
+    automationWindow = automation;
+    automation.on("closed", () => {
+      if (automationWindow === automation) {
+        automationWindow = null;
+      }
     });
     try {
       await automation.loadURL(marker);
       const page = await waitForPage(browser, marker);
-      automation.show();
       return page;
     } catch (err) {
       if (!automation.isDestroyed()) {
         automation.close();
       }
       throw err;
+    }
+  });
+
+  // Άμεση εφαρμογή της ρύθμισης debug ακόμη κι αν υπάρχει ήδη ενεργή
+  // εργασία (ο κύριος κώδικας μοιράζεται τη διεργασία με τον διακομιστή).
+  onPreferencesChanged((preferences) => {
+    const window = automationWindow;
+    if (!window || window.isDestroyed()) {
+      return;
+    }
+    if (preferences.debugShowAutomation) {
+      window.show();
+    } else {
+      window.hide();
     }
   });
 

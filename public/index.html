@@ -107,6 +107,21 @@
             placeholder="Άφησέ το κενό για να μην αλλάξει"
           />
         </label>
+
+        <section class="dialog-section">
+          <h3>Debug</h3>
+          <label class="check-field">
+            <input type="checkbox" id="set-debug-window" />
+            Εμφάνιση του παραθύρου εργασίας κατά την εκτέλεση
+          </label>
+          <p class="hint">
+            Κανονικά το παράθυρο στο οποίο εκτελείται η εργασία είναι κρυφό,
+            ώστε να μην μπορείς να το ανακατέψεις με ποντίκι ή πληκτρολόγιο.
+            Όταν ενεργοποιηθεί, εμφανίζεται άμεσα (ακόμη κι ενώ τρέχει η
+            εργασία) και μπορείς να το κλείσεις ξανά από εδώ.
+          </p>
+        </section>
+
         <p id="settings-hint" class="hint"></p>
         <p id="settings-error" class="dialog-error hidden"></p>
         <div class="dialog-actions">

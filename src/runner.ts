@@ -8,7 +8,7 @@ import { errorShotPath, rootDir } from "./paths.js";
 import { attachScreencast } from "./screencast.js";
 import type { ScreencastHandle } from "./screencast.js";
 import { default as start } from "./start.js";
-import type { XLSX_JSON } from "./types";
+import type { XLSX_JSON } from "./types.js";
 import { getSelectedFile, parseXlsx } from "./xlsx.js";
 
 /** Παραγωγή της σελίδας που θα ελέγξει η εργασία */
@@ -122,6 +122,9 @@ class Runner {
         acceptInsecureCerts: true,
       });
       this.activeBrowser = browser;
+      // Καθαρισμός των cookies ώστε να μην επηρεάζουν την εκτέλεση προηγούμενες συνδέσεις
+      console.log("Καθαρισμός cookies του φυλλομετρητή");
+      await browser.deleteCookie(...(await browser.cookies()));
       const page = pageFactory
         ? await pageFactory(browser)
         : await browser.newPage();

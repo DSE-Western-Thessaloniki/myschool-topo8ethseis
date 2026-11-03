@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-import consoleStamp from "console-stamp";
+import * as consoleStamp from "console-stamp";
 import { installLogger } from "./logger.js";
 import { runner } from "./runner.js";
 import { startServer } from "./ui/server.js";
@@ -8,7 +8,7 @@ import { startServer } from "./ui/server.js";
 dotenv.config();
 
 // Πρόσθεσε χρονοσφραγίδα στα μηνύματα του αρχείου καταγραφής
-consoleStamp(console);
+(consoleStamp as unknown as (target: Console) => void)(console);
 
 // Αιχμαλώτισε τα μηνύματα της κονσόλας για να εμφανίζονται ζωντανά στην
 // διεπαφή (πρέπει να γίνει μετά το consoleStamp, ώστε να μην καταγράφεται
@@ -29,7 +29,7 @@ const noRun =
 
 if (noRun) {
   console.log(
-    "Η διεπαφή ετοιμάστηκε χωρίς αυτόματη εκκίνηση. Πάτησε «Εκκίνηση» στον browser."
+    "Η διεπαφή ετοιμάστηκε χωρίς αυτόματη εκκίνηση. Πάτησε «Εκκίνηση» στον browser.",
   );
 } else {
   runner.run().catch((err) => {

@@ -4,7 +4,7 @@ import { bus } from "./bus.js";
 import { errorText } from "./errors.js";
 import { errorShotPath, imgDir } from "./paths.js";
 import { getCredentials } from "./settings.js";
-import type { XLSX_JSON } from "./types";
+import type { XLSX_JSON } from "./types.js";
 
 async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
   console.log(teacher);
@@ -67,14 +67,14 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       console.log("Πληκτρολόγησε το ΑΜ/ΑΦΜ του εκπαιδευτικού");
       return await page.type(
         "#ctl00_ContentData_cmbWorker_I",
-        record["ΑΜ/ΑΦΜ"]
+        record["ΑΜ/ΑΦΜ"],
       );
     })
     .then(async () => {
       console.log("Δες αν βρέθηκε ο/η εκπαιδευτικός");
       return await page.waitForSelector(
         "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0",
-        { visible: true }
+        { visible: true },
       );
     })
     // .then(async () => {
@@ -106,18 +106,18 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       // που εισάγαμε. Μετράει τις γραμμές πέρα από την πρώτη
       const rows = (
         await page.$$(
-          "#ctl00_ContentData_cmbWorker_DDD_gv_DXMainTable tr.dxgvDataRow"
+          "#ctl00_ContentData_cmbWorker_DDD_gv_DXMainTable tr.dxgvDataRow",
         )
       ).length;
       console.log(`Βρέθηκαν ${rows} επιπλέον γραμμές πλην της κύριας`);
 
       let am = await page.$eval(
         "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0 td:nth-child(1)",
-        (el) => el.textContent
+        (el) => el.textContent,
       );
       let afm = await page.$eval(
         "#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow0 td:nth-child(2)",
-        (el) => el.textContent
+        (el) => el.textContent,
       );
       if (am != record["ΑΜ/ΑΦΜ"] && afm != record["ΑΜ/ΑΦΜ"]) {
         console.log("Λάθος ΑΜ στην πρώτη γραμμή!");
@@ -130,13 +130,13 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
           `#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow${
             i + 1
           } td:nth-child(1)`,
-          (el) => el.textContent
+          (el) => el.textContent,
         );
         let afm = await page.$eval(
           `#ctl00_ContentData_cmbWorker_DDD_gv_DXDataRow${
             i + 1
           } td:nth-child(2)`,
-          (el) => el.textContent
+          (el) => el.textContent,
         );
         if (am != record["ΑΜ/ΑΦΜ"] && afm != record["ΑΜ/ΑΦΜ"]) {
           console.log(`Λάθος ΑΜ στην ${i + 1}η γραμμή!`);
@@ -159,14 +159,14 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
           }
 
           return await Promise.reject(
-            new Error("Δεν μπορώ να κάνω κλικ στον εκπαιδευτικό!")
+            new Error("Δεν μπορώ να κάνω κλικ στον εκπαιδευτικό!"),
           );
         });
     })
     .then(async () => {
       console.log("Περίμενε μέχρι να περαστεί το ωράριο του/της εκπαιδευτικού");
       return await page.waitForSelector(
-        "span.dxeIRadioButton.dxEditors_edtRadioButtonChecked"
+        "span.dxeIRadioButton.dxEditors_edtRadioButtonChecked",
       );
     })
     .then(async () => {
@@ -178,12 +178,12 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
     .then(async () => {
       console.log("Δες αν βρέθηκε το σχολείο");
       await page.waitForSelector(
-        "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected"
+        "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected",
       );
       await new Promise((r) => setTimeout(r, 2000));
       const sch = await page.$eval(
         "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected:nth-child(1)",
-        (el) => el.textContent
+        (el) => el.textContent,
       );
       if (sch != record["ΣΧΟΛΕΙΟ"]) {
         console.log(sch);
@@ -199,7 +199,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       console.log("Κάνε κλικ στο σχολείο");
       return await page
         .$(
-          "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected"
+          "table#ctl00_ContentData_cmbUnit_DDD_L_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected",
         )
         .then(async (element) => {
           if (element) {
@@ -207,7 +207,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
           }
 
           return await Promise.reject(
-            new Error("Δεν μπορώ να κάνω κλικ στο σχολείο!")
+            new Error("Δεν μπορώ να κάνω κλικ στο σχολείο!"),
           );
         });
     })
@@ -218,7 +218,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
     .then(async () => {
       console.log("Διάβασε τους τύπους τοποθέτησης και επέλεξε τον κατάλληλο");
       const elements = await page.$$(
-        "#ctl00_ContentData_cbpEmploymentType_lbEmploymentType_LBT td"
+        "#ctl00_ContentData_cbpEmploymentType_lbEmploymentType_LBT td",
       );
       console.log(elements.length);
       let categories: Array<{ id: string; name: string }> = [];
@@ -239,8 +239,8 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
               record["ΑΜ/ΑΦΜ"] +
               ' τοποθέτηση: "' +
               record["ΤΟΠΟΘΕΤΗΣΗ"] +
-              '"'
-          )
+              '"',
+          ),
         );
       }
 
@@ -254,14 +254,14 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
         return await page.click("#" + found_id);
       } else {
         return await Promise.reject(
-          new Error("Δεν βρέθηκε το id της τοποθέτησης!")
+          new Error("Δεν βρέθηκε το id της τοποθέτησης!"),
         );
       }
     })
     .then(async () => {
       // Συμπλήρωσε την έναρξη τοποθέτησης
       console.log(
-        "Συμπλήρωση την ημερομηνία έναρξης τοποθέτησης (" + record["ΑΠΟ"] + ")"
+        "Συμπλήρωση την ημερομηνία έναρξης τοποθέτησης (" + record["ΑΠΟ"] + ")",
       );
       // return await page.evaluate(`async () => {
       //   const el = document.getElementById("ctl00_ContentData_dateFrom_I");
@@ -311,7 +311,7 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       if (input !== null) {
         await page.click("#ctl00_ContentData_dateFrom_I", {
           delay: 1000, // Χρειάζεται αλλιώς δεν παίζει σωστά
-          clickCount: 3,
+          count: 3,
         });
         await page.type("#ctl00_ContentData_dateFrom_I", record["ΑΠΟ"], {
           delay: 100,
@@ -321,21 +321,21 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       } else {
         return await Promise.reject(
           new Error(
-            "Δεν βρέθηκε το πεδίο την ημερομηνία έναρξης ισχύος τοποθέτησης!"
-          )
+            "Δεν βρέθηκε το πεδίο την ημερομηνία έναρξης ισχύος τοποθέτησης!",
+          ),
         );
       }
     })
     .then(async () => {
       // Συμπλήρωσε την λήξη τοποθέτησης
       console.log(
-        "Συμπλήρωση την ημερομηνία λήξης τοποθέτησης (" + record["ΕΩΣ"] + ")"
+        "Συμπλήρωση την ημερομηνία λήξης τοποθέτησης (" + record["ΕΩΣ"] + ")",
       );
       const input = await page.waitForSelector("#ctl00_ContentData_dateTo_I");
       if (input !== null) {
         await page.click("#ctl00_ContentData_dateTo_I", {
           delay: 1000,
-          clickCount: 3,
+          count: 3,
         });
         await page.type("#ctl00_ContentData_dateTo_I", record["ΕΩΣ"], {
           delay: 100,
@@ -344,8 +344,8 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       } else {
         return await Promise.reject(
           new Error(
-            "Δεν βρέθηκε το πεδίο την ημερομηνία λήξης ισχύος τοποθέτησης!"
-          )
+            "Δεν βρέθηκε το πεδίο την ημερομηνία λήξης ισχύος τοποθέτησης!",
+          ),
         );
       }
     })
@@ -354,13 +354,13 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
       if (record["ΩΡΕΣ"]) {
         const hours = parseInt(record["ΩΡΕΣ"]);
         const radioButton = await page.$(
-          "#ctl00_ContentData_lbEditHours_RB" + (hours - 1) + "_I_D"
+          "#ctl00_ContentData_lbEditHours_RB" + (hours - 1) + "_I_D",
         );
         if (radioButton) {
           return await radioButton.click();
         } else {
           return await Promise.reject(
-            new Error("Δεν βρέθηκε το radioButton για την επιλογή των ωρών.")
+            new Error("Δεν βρέθηκε το radioButton για την επιλογή των ωρών."),
           );
         }
       } else {
@@ -519,7 +519,9 @@ export default async function start({
         return { stopped: true };
       }
       if (errorFound) {
-        return await Promise.reject(new Error(lastError ?? "Σφάλμα κατά την καταχώρηση"));
+        return await Promise.reject(
+          new Error(lastError ?? "Σφάλμα κατά την καταχώρηση"),
+        );
       }
 
       return { stopped: false };
