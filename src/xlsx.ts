@@ -1,5 +1,5 @@
 import xlsx from "xlsx";
-import type { XLSX_JSON } from "./types";
+import type { XLSX_JSON } from "./types.js";
 
 /** Οι στήλες που είναι απαραίτητες για τις τοποθετήσεις */
 export const necessary_headers = [

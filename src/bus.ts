@@ -1,4 +1,4 @@
-import type { XLSX_JSON } from "./types";
+import type { XLSX_JSON } from "./types.js";
 
 /** Επίπεδο καταγραφής ενός μηνύματος */
 export type LogLevel = "info" | "warn" | "error";
@@ -111,7 +111,12 @@ function safeInspect(value: unknown): string {
 function setState(next: RunState, nextMessage?: string): void {
   state = next;
   message = nextMessage;
-  publish({ type: "state", state: next, message: nextMessage, time: Date.now() });
+  publish({
+    type: "state",
+    state: next,
+    message: nextMessage,
+    time: Date.now(),
+  });
 }
 
 /**

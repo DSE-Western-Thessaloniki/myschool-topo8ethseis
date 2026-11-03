@@ -33,6 +33,7 @@ const els = {
   settingsForm: el<HTMLFormElement>("settings-form"),
   setUsername: el<HTMLInputElement>("set-username"),
   setPassword: el<HTMLInputElement>("set-password"),
+  setDebugWindow: el<HTMLInputElement>("set-debug-window"),
   settingsHint: el<HTMLElement>("settings-hint"),
   settingsError: el<HTMLElement>("settings-error"),
   settingsCancel: el<HTMLButtonElement>("btn-settings-cancel"),
@@ -417,6 +418,21 @@ async function loadSettings(): Promise<void> {
   }
 }
 
+type PreferencesInfo = {
+  debugShowAutomation: boolean;
+};
+
+async function loadPreferences(): Promise<void> {
+  try {
+    const response = await fetch("/api/preferences");
+    if (!response.ok) return;
+    const preferences = (await response.json()) as PreferencesInfo;
+    els.setDebugWindow.checked = preferences.debugShowAutomation;
+  } catch {
+    // Η σύνδεση θα επανέλθει μόνη της
+  }
+}
+
 function showSettingsError(message: string): void {
   els.settingsError.textContent = message;
   els.settingsError.classList.toggle("hidden", !message);
@@ -424,7 +440,9 @@ function showSettingsError(message: string): void {
 
 els.btnSettings.addEventListener("click", () => {
   showSettingsError("");
-  void loadSettings().then(() => els.settingsDialog.showModal());
+  void Promise.all([loadSettings(), loadPreferences()]).then(() =>
+    els.settingsDialog.showModal()
+  );
 });
 
 els.settingsCancel.addEventListener("click", () => {
@@ -452,6 +470,20 @@ els.settingsForm.addEventListener("submit", (event) => {
         showSettingsError(body?.error ?? "Αποτυχία αποθήκευσης");
         return;
       }
+
+      // Προτιμήσεις (debug) — μόλις αποθηκευτούν σωστά τα στοιχεία
+      const preferencesResponse = await fetch("/api/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          debugShowAutomation: els.setDebugWindow.checked,
+        }),
+      });
+      if (!preferencesResponse.ok) {
+        showSettingsError("Αποτυχία αποθήκευσης των προτιμήσεων");
+        return;
+      }
+
       if (body.info) {
         renderSettings(body.info);
       }

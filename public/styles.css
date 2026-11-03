@@ -446,7 +446,39 @@ dialog .field {
   color: var(--muted);
 }
 
-dialog input {
+/* Ενότητα Debug μέσα στο παράθυρο ρυθμίσεων */
+.dialog-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.dialog-section h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.check-field input {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+dialog input[type="text"],
+dialog input[type="password"] {
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--border);

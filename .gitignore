@@ -5,3 +5,4 @@ file.xlsx
 *.log
 .env
 credentials.json
+preferences.json
