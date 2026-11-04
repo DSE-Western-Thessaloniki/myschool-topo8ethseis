@@ -454,7 +454,7 @@ function renderSettings(info: SettingsInfo): void {
   if (info.source === "settings") {
     parts.push(
       info.encryption === "os-keychain"
-        ? "κρυπτογραφημένα στο κλειδοθήκη του συστήματος"
+        ? "κρυπτογραφημένα στη κλειδοθήκη του συστήματος"
         : "απλό κείμενο (δεν βρέθηκε κλειδοθήκης)",
     );
   }
