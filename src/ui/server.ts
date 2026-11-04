@@ -67,6 +67,16 @@ export function startServer(port: number): Promise<number> {
   // Οι φάκελοι δεδομένων (img/) πρέπει να υπάρχουν πριν γραφτούν στιγμιότυπα
   ensureDataDirs();
 
+  app.get("/", (_req, res) => {
+    const packageJson = JSON.parse(
+      fs.readFileSync(path.join(rootDir, "package.json"), "utf8"),
+    ) as { version: string };
+    const indexHtml = fs
+      .readFileSync(path.join(publicDir, "index.html"), "utf8")
+      .replaceAll("{{APP_VERSION}}", packageJson.version);
+    res.type("html").send(indexHtml);
+  });
+
   // Τα στατικά της διεπαφής (index.html, styles.css) και ο κώδικας που
   // μεταγλωττίστηκε από public/app.ts σε dist/public/app.js
   app.use(express.static(publicDir, { dotfiles: "deny" }));
@@ -144,11 +154,15 @@ export function startServer(port: number): Promise<number> {
         // Κενό πεδίο κωδικού = κράτα τον ήδη αποθηκευμένο
         const password = incomingPassword || current.password;
         if (!username) {
-          res.status(400).json({ error: "Συμπλήρωσε το όνομα χρήστη" });
+          res
+            .status(400)
+            .json({ error: "Το όνομα χρήστη δεν μπορεί να είναι κενό" });
           return;
         }
         if (!password) {
-          res.status(400).json({ error: "Συμπλήρωσε τον κωδικό" });
+          res
+            .status(400)
+            .json({ error: "Ο κωδικός δεν μπορεί να είναι κενός" });
           return;
         }
         const saved = await saveCredentials({ username, password });
