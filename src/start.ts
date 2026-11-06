@@ -65,6 +65,9 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
     .then(async () => {
       // Συμπλήρωσε το ΑΜ/ΑΦΜ και περίμενε για το αποτέλεσμα της αναζήτησης
       console.log("Πληκτρολόγησε το ΑΜ/ΑΦΜ του εκπαιδευτικού");
+      // Έλεγξε αν η σελίδα φορτώνει ακόμα και μετά κάνε κλικ στο πεδίο
+      await page.waitForNetworkIdle();
+      await page.click("#ctl00_ContentData_cmbWorker_I");
       return await page.type(
         "#ctl00_ContentData_cmbWorker_I",
         record["ΑΜ/ΑΦΜ"],
@@ -213,7 +216,17 @@ async function addTeacher(page: Page, teacher: XLSX_JSON, index: number) {
     })
     .then(async () => {
       console.log("Περίμενε για ανάκτηση δεδομένων τύπων τοποθέτησης");
-      return await new Promise((r) => setTimeout(r, 2000));
+      return await Promise.any([
+        page.waitForSelector(
+          "#ctl00_ContentData_cbpEmploymentType_lbEmploymentType_LBT td",
+        ),
+        page.waitForSelector(
+          "#ctl00_ContentData_cbpEmploymentType_lbEmploymentType_LBT > tbody > tr > td.dxeFTM.dxeListBoxItemSelected",
+        ),
+      ]);
+    })
+    .then(async () => {
+      return await page.waitForNetworkIdle();
     })
     .then(async () => {
       console.log("Διάβασε τους τύπους τοποθέτησης και επέλεξε τον κατάλληλο");
